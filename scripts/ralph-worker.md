@@ -41,7 +41,7 @@ You are a worker agent in an autonomous implement-evaluate-fix loop. Your job is
 7. **Read the spec if needed**: Specs are in `specs/`. The task details should be self-contained, but if you need broader context, read the relevant spec.
 
 8. **Implement the task**: Follow the details exactly. Create/modify files as specified. Key rules:
-   - The iOS project lives in `ios/PageDewarp/`
+   - The iOS project lives at the repo root
    - Use Double (float64) for parameter vector and optimizer
    - Use the OpenCV bridge pattern for all OpenCV calls (ObjC++ wrapper)
    - Write XCTests for testable modules
@@ -49,22 +49,21 @@ You are a worker agent in an autonomous implement-evaluate-fix loop. Your job is
 
 9. **Verify**: Build and test:
    ```bash
+   # Generate project and install pods if needed
+   xcodegen generate && pod install
+
    # Build
    xcodebuild build-for-testing \
-     -workspace ios/PageDewarp/PageDewarp.xcworkspace \
+     -workspace PageDewarp.xcworkspace \
      -scheme PageDewarp \
-     -destination "platform=iOS Simulator,id=CCA751AB-1238-4B63-98F9-77875A75F07A" \
+     -destination "platform=iOS Simulator,name=iPhone 16" \
      -quiet
 
    # Run all tests
    xcodebuild test \
-     -workspace ios/PageDewarp/PageDewarp.xcworkspace \
+     -workspace PageDewarp.xcworkspace \
      -scheme PageDewarp \
-     -destination "platform=iOS Simulator,id=CCA751AB-1238-4B63-98F9-77875A75F07A"
-   ```
-   If the simulator UUID doesn't work, rediscover:
-   ```bash
-   xcrun simctl list devices available | grep "iPhone.*26.4" | head -3
+     -destination "platform=iOS Simulator,name=iPhone 16"
    ```
 
 10. **Commit**: Stage and commit the changes with a conventional commit message:

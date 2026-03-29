@@ -27,7 +27,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 LOG_DIR="$PROJECT_DIR/scripts/ralph-logs"
-STATUS_FILE="$PROJECT_DIR/ios/PageDewarp/.ralph-status"
+STATUS_FILE="$PROJECT_DIR/.ralph-status"
 WORKER_PROMPT="$SCRIPT_DIR/ralph-worker.md"
 EVALUATOR_PROMPT="$SCRIPT_DIR/ralph-evaluator.md"
 

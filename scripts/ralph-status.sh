@@ -18,7 +18,7 @@ if [[ -f "$LOG_DIR/ralph.log" ]]; then
 fi
 
 # Convergence status
-STATUS_FILE="$PROJECT_DIR/ios/PageDewarp/.ralph-status"
+STATUS_FILE="$PROJECT_DIR/.ralph-status"
 if [[ -f "$STATUS_FILE" ]]; then
     echo "Convergence: $(cat "$STATUS_FILE")"
 else

@@ -17,11 +17,11 @@ The port was built using "Ralph" -- a two-agent autonomous loop:
                      (reviews)
 ```
 
-**Worker**: Picks a pending task from [STM](https://github.com/nicobailon/task-master-stm) (a CLI task manager), implements it, runs tests, commits. One task per invocation.
+**Worker** ([`scripts/ralph-worker.md`](../scripts/ralph-worker.md)): Picks a pending task from [STM](https://github.com/nicobailon/task-master-stm) (a CLI task manager), implements it, runs tests, commits. One task per invocation.
 
-**Evaluator**: Reviews recent work, runs the build, reads code, compares against the Python reference. Creates fix tasks for issues found.
+**Evaluator** ([`scripts/ralph-evaluator.md`](../scripts/ralph-evaluator.md)): Reviews recent work, runs the build, reads code, compares against the Python reference. Creates fix tasks for issues found.
 
-**Loop driver**: A shell script that alternates between worker and evaluator invocations until convergence (all tasks done, no new issues).
+**Loop driver** ([`scripts/ralph-loop.sh`](../scripts/ralph-loop.sh)): A shell script that alternates between worker and evaluator invocations until convergence (all tasks done, no new issues). Also includes a status checker ([`scripts/ralph-status.sh`](../scripts/ralph-status.sh)).
 
 ### Worker prompt highlights
 

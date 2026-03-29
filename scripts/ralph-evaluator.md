@@ -20,7 +20,7 @@ You are an evaluator agent in an autonomous implement-evaluate-fix loop. Your jo
 
    b. **Test check**: Run `xcodebuild test` on the iOS project. If tests fail, create fix tasks.
 
-   c. **Code review**: For each Swift file in `ios/PageDewarp/Sources/Core/`:
+   c. **Code review**: For each Swift file in `Sources/Core/`:
       - Read the Swift file and the corresponding Python source
       - Check: Does the Swift code faithfully implement the Python algorithm?
       - Check: Are edge cases handled (zero-division, empty arrays, nil returns)?
@@ -107,9 +107,9 @@ You are an evaluator agent in an autonomous implement-evaluate-fix loop. Your jo
    - Or re-scope the blocked task with reduced requirements
 
 7. **Check for convergence**: If deep evaluation found:
-   - 0 issues: Write "CONVERGED" to `ios/PageDewarp/.ralph-status` and exit
+   - 0 issues: Write "CONVERGED" to `.ralph-status` and exit
    - Only `low` priority issues: Write "CONVERGED" (good enough)
-   - Any `critical` or `high` issues: Write "NEEDS_FIXES" to status file
+   - Any `critical` or `high` issues: Write "NEEDS_FIXES" to `.ralph-status`
 
 8. **Report**: Print a summary of findings and any new tasks created.
 
