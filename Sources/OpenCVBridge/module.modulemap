@@ -1,0 +1,7 @@
+// Module map for the PageDewarp framework's ObjC++ bridge layer.
+// Framework targets cannot use SWIFT_OBJC_BRIDGING_HEADER — this modulemap
+// is used instead so Swift can access OpenCVWrapper from within the framework.
+framework module PageDewarp {
+    header "OpenCVWrapper.h"
+    export *
+}

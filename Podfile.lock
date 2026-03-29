@@ -1,0 +1,16 @@
+PODS:
+  - OpenCV-Dynamic-Framework (4.10.0.1)
+
+DEPENDENCIES:
+  - OpenCV-Dynamic-Framework (~> 4.10)
+
+SPEC REPOS:
+  trunk:
+    - OpenCV-Dynamic-Framework
+
+SPEC CHECKSUMS:
+  OpenCV-Dynamic-Framework: b9483ac40f2e5459231f5d140f1fb754ec605e2b
+
+PODFILE CHECKSUM: 2f6d193ab34a16315251e74d7340e9479caec5a3
+
+COCOAPODS: 1.16.2

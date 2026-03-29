@@ -1,0 +1,61 @@
+name: PageDewarp
+
+options:
+  bundleIdPrefix: com.example.pagedewarp
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15"
+  generateEmptyDirectories: true
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+
+targets:
+  PageDewarp:
+    type: framework
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Sources
+      - path: Sources/OpenCVBridge/OpenCVWrapper.h
+        type: header
+        headerVisibility: public
+    settings:
+      base:
+        MODULEMAP_FILE: Sources/OpenCVBridge/module.modulemap
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.pagedewarp
+        GENERATE_INFOPLIST_FILE: YES
+        DEFINES_MODULE: YES
+        SWIFT_EMIT_LOC_STRINGS: NO
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+
+  PageDewarpTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Tests
+        excludes:
+          - GoldenFiles/**
+      - path: Tests/GoldenFiles
+        buildPhase: resources
+    dependencies:
+      - target: PageDewarp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.pagedewarp.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  PageDewarp:
+    build:
+      targets:
+        PageDewarp: all
+        PageDewarpTests: [test]
+    test:
+      targets:
+        - PageDewarpTests

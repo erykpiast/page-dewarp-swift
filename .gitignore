@@ -1,0 +1,25 @@
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+build/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.xcuserstate
+xcuserdata/
+
+# CocoaPods
+Pods/
+
+# Xcodegen can regenerate the project
+# project.pbxproj is regenerated from project.yml
+
+# OS
+.DS_Store
+*.swp
+*~
+
+# Ralph status
+.ralph-status
