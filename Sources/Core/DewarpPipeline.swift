@@ -104,9 +104,15 @@ class DewarpPipeline {
             rvecRange: DewarpConfig.rvecIdx
         )
 
-        // Step 12: run Powell optimizer.
-        // Ported from image.py:123-130 → powellMinimize
-        let optResult = powellMinimize(objective: objective, x0: initialParams)
+        // Step 12: run L-BFGS-B optimizer with analytical gradient.
+        // Ported from image.py:123-130 → optimise_params
+        let gradObjective: ([Double]) -> (f: Double, grad: [Double]) = { pvec in
+            objectiveAndGradient(
+                pvec: pvec, dstpoints: dstpoints, keypointIndex: keypointIndex,
+                shearCost: DewarpConfig.shearCost, focalLength: DewarpConfig.focalLength
+            )
+        }
+        let optResult = lbfgsbMinimize(objectiveAndGradient: gradObjective, x0: initialParams)
         let params = optResult.x
 
         // Step 13: optimize page dimensions.
