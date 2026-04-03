@@ -12,7 +12,7 @@ This document details how the Swift implementation differs from the [Python refe
 | `keypoints.py` | `Keypoints.swift` | Keypoint index construction |
 | `projection.py` | `Projection.swift` | Identical cubic model |
 | `solve.py` | `Solver.swift` | Uses OpenCV solvePnP via bridge |
-| `optimise/` | `PowellOptimizer.swift` + `Objective.swift` | Custom Powell instead of SciPy |
+| `optimise/` | `LBFGSBOptimizer.swift` + `AnalyticalGradient.swift` + `PureProjection.swift` | L-BFGS-B-C (same code as SciPy) with analytical gradients; Powell retained for page-dim only |
 | `dewarp.py` | `Remapper.swift` | Same decimation grid approach |
 | `normalisation.py` | `Normalisation.swift` | Identical math |
 | `mask.py` | `OpenCVWrapper.mm` | Mask pipeline moved into ObjC++ bridge |
@@ -38,16 +38,16 @@ This document details how the Swift implementation differs from the [Python refe
 
 This adds marshalling overhead but preserves correctness. All internal computation uses `Double` (float64) matching Python's precision.
 
-### 3. Optimizer: Powell vs L-BFGS-B
+### 3. Optimizer: L-BFGS-B
 
 **Python**: Uses `scipy.optimize.minimize(method='L-BFGS-B')` with JAX autodiff providing analytical gradients. Falls back to Powell if JAX is unavailable.
 
-**Swift**: Uses a custom implementation of Powell's conjugate direction method with Brent's 1D line search, ported from SciPy's `_optimize.py`. No gradient computation.
+**Swift**: Uses the same L-BFGS-B algorithm via a vendored copy of `L-BFGS-B-C` (stephenbeckr/L-BFGS-B-C, BSD-3) — the identical C code that SciPy wraps internally. Gradients are computed analytically via hand-coded chain rule through Rodrigues rotation, pinhole projection, and the cubic polynomial — functionally equivalent to Python's JAX autodiff approach.
 
-Implications:
-- Swift needs more function evaluations to converge (~600K max vs ~300 typical for L-BFGS-B)
-- Powell may find different local minima, leading to slightly different (but visually acceptable) results
-- Processing time: 2-17 seconds per image (Swift/Powell) vs 0.3-0.5 seconds (Python/JAX)
+Remaining differences:
+- Swift uses hand-coded analytical gradients; Python uses JAX reverse-mode autodiff. Both produce mathematically identical gradients.
+- The pure-Swift projection (`PureProjection.swift`) replaces OpenCV's `projectPoints` in the optimization loop, eliminating all bridge crossings during gradient computation.
+- Powell is retained for the 2D page-dimension optimization only (2 parameters, where L-BFGS-B is overkill).
 
 ### 4. Mask Computation Location
 

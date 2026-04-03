@@ -3,5 +3,6 @@
 // is used instead so Swift can access OpenCVWrapper from within the framework.
 framework module PageDewarp {
     header "OpenCVWrapper.h"
+    header "lbfgsb.h"
     export *
 }
