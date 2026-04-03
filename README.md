@@ -10,7 +10,7 @@ iOS/Swift port of the [page-dewarp](https://github.com/lemonzi/page-dewarp) docu
 |:-----:|:---------------:|:----------:|
 | ![Input](comparison/input.jpg) | ![Python](comparison/python.png) | ![Swift](comparison/swift.png) |
 
-Tested on 20 images from a recipe book. Pixel match with the Python reference ranges from 81-96%, with an average around 89%. Both implementations produce visually correct, flat, readable output.
+Both implementations produce visually correct, flat, readable output. Pixel match with the Python reference is ~96% on this image.
 
 ## How It Works
 
@@ -21,7 +21,7 @@ The pipeline detects curved text lines in a page photo, fits a 3D cubic surface 
 3. **Assemble** contours into horizontal spans
 4. **Sample** keypoints along each span
 5. **Estimate** initial 3D pose via `solvePnP`
-6. **Optimize** cubic surface parameters (Powell's method)
+6. **Optimize** cubic surface parameters (L-BFGS-B with analytical gradients)
 7. **Remap** the original image through the optimized surface model
 8. **Threshold** the result into a clean binary image
 
