@@ -8,7 +8,7 @@ iOS/Swift port of the [page-dewarp](https://github.com/lemonzi/page-dewarp) docu
 
 | Input | Python reference | Swift port |
 |:-----:|:---------------:|:----------:|
-| ![Input](comparison/input.jpg) | ![Python](comparison/python.png) | ![Swift](comparison/swift.png) |
+| <img src="comparison/input.jpg" height="300"> | <img src="comparison/python.png" height="300"> | <img src="comparison/swift.png" height="300"> |
 
 Both implementations produce visually correct, flat, readable output. Pixel match with the Python reference is ~96% on this image.
 
