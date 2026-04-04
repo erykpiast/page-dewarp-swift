@@ -2,6 +2,9 @@
 // Ported from src/page_dewarp/solve.py
 
 import Foundation
+#if SWIFT_PACKAGE
+import OpenCVBridge
+#endif
 
 /// Errors produced by the solver.
 enum SolverError: Error {

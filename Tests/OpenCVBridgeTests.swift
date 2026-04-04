@@ -1,5 +1,8 @@
 import XCTest
 @testable import PageDewarp
+#if SWIFT_PACKAGE
+import OpenCVBridge
+#endif
 
 final class OpenCVBridgeTests: XCTestCase {
 

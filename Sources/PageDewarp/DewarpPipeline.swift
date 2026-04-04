@@ -3,6 +3,9 @@
 
 import Foundation
 import UIKit
+#if SWIFT_PACKAGE
+import OpenCVBridge
+#endif
 
 // MARK: - Pipeline
 
@@ -12,11 +15,11 @@ import UIKit
 /// parameter optimization, page-dim optimization, and image remapping.
 ///
 /// Ported from image.py:69-259 (WarpedImage)
-class DewarpPipeline {
+public class DewarpPipeline {
 
     // MARK: - Error types
 
-    enum DewarpError: Error {
+    public enum DewarpError: Error {
         case noContoursDetected
         case insufficientSpans(count: Int)
         case solvePnPFailed
@@ -31,7 +34,7 @@ class DewarpPipeline {
     ///
     /// - Parameter image: Input page photo (any orientation, any scale).
     /// - Returns: `.success(UIImage)` with the dewarped output, or `.failure(DewarpError)`.
-    static func process(image: UIImage) -> Result<UIImage, DewarpError> {
+    public static func process(image: UIImage) -> Result<UIImage, DewarpError> {
         // Step 1: resize to screen size if needed.
         // Ported from image.py:92-96 via resize_to_screen
         let small = resizeToScreen(image: image)

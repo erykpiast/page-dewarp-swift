@@ -8,8 +8,14 @@ import XCTest
 
 class GoldenFileLoader {
     static func loadJSON<T: Decodable>(_ filename: String) throws -> T {
+        #if SWIFT_PACKAGE
+        let bundle = Bundle.module
+        let subdirectory: String? = "GoldenFiles"
+        #else
         let bundle = Bundle(for: Self.self)
-        guard let url = bundle.url(forResource: filename, withExtension: "json") else {
+        let subdirectory: String? = nil
+        #endif
+        guard let url = bundle.url(forResource: filename, withExtension: "json", subdirectory: subdirectory) else {
             throw NSError(
                 domain: "GoldenFiles",
                 code: 1,
@@ -21,15 +27,21 @@ class GoldenFileLoader {
     }
 
     static func loadImage(_ filename: String) throws -> UIImage {
+        #if SWIFT_PACKAGE
+        let bundle = Bundle.module
+        let subdirectory: String? = "GoldenFiles"
+        #else
         let bundle = Bundle(for: Self.self)
-        guard let path = bundle.path(forResource: filename, ofType: nil) else {
+        let subdirectory: String? = nil
+        #endif
+        guard let url = bundle.url(forResource: filename, withExtension: nil, subdirectory: subdirectory) else {
             throw NSError(
                 domain: "GoldenFiles",
                 code: 2,
                 userInfo: [NSLocalizedDescriptionKey: "Missing \(filename)"]
             )
         }
-        guard let image = UIImage(contentsOfFile: path) else {
+        guard let image = UIImage(contentsOfFile: url.path) else {
             throw NSError(
                 domain: "GoldenFiles",
                 code: 3,

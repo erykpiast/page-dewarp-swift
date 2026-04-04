@@ -6,6 +6,9 @@
 // See Sources/LBFGSB/LICENSE for the full license text.
 
 import Foundation
+#if SWIFT_PACKAGE
+import CLBFGSB
+#endif
 
 // MARK: - Finite-Difference Gradient
 

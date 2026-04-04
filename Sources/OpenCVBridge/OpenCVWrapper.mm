@@ -3,7 +3,7 @@
 #import <opencv2/imgproc.hpp>
 #import <opencv2/calib3d.hpp>
 
-#import "OpenCVWrapper.h"
+#import "include/OpenCVWrapper.h"
 
 // MARK: - Private helpers
 

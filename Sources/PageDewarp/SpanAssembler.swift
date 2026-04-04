@@ -2,6 +2,9 @@
 // Ported from src/page_dewarp/spans.py
 
 import Foundation
+#if SWIFT_PACKAGE
+import OpenCVBridge
+#endif
 
 // MARK: - Angle distance
 

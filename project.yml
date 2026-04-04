@@ -19,17 +19,24 @@ targets:
     platform: iOS
     deploymentTarget: "16.0"
     sources:
-      - path: Sources
-      - path: Sources/OpenCVBridge/OpenCVWrapper.h
+      - path: Sources/PageDewarp
+      - path: Sources/OpenCVBridge
+        excludes:
+          - "module.modulemap"
+      - path: Sources/OpenCVBridge/include/OpenCVWrapper.h
         type: header
         headerVisibility: public
-      - path: Sources/LBFGSB/lbfgsb.h
+      - path: Sources/CLBFGSB
+        excludes:
+          - "include"
+          - "LICENSE"
+      - path: Sources/CLBFGSB/include/lbfgsb.h
         type: header
         headerVisibility: public
     settings:
       base:
         MODULEMAP_FILE: Sources/OpenCVBridge/module.modulemap
-        HEADER_SEARCH_PATHS: ["$(SRCROOT)/Sources/LBFGSB"]
+        HEADER_SEARCH_PATHS: ["$(SRCROOT)/Sources/CLBFGSB/include"]
         PRODUCT_BUNDLE_IDENTIFIER: com.example.pagedewarp
         GENERATE_INFOPLIST_FILE: YES
         DEFINES_MODULE: YES

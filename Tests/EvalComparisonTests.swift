@@ -3,6 +3,9 @@
 
 import XCTest
 @testable import PageDewarp
+#if SWIFT_PACKAGE
+import OpenCVBridge
+#endif
 
 class EvalComparisonTests: XCTestCase {
 

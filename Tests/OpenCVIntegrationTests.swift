@@ -1,5 +1,8 @@
 import XCTest
 @testable import PageDewarp
+#if SWIFT_PACKAGE
+import OpenCVBridge
+#endif
 
 /// Verifies that OpenCV is linked and accessible from Swift via the ObjC++ bridge.
 final class OpenCVIntegrationTests: XCTestCase {

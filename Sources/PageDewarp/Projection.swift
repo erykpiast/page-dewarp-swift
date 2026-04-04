@@ -2,6 +2,9 @@
 // Ported from src/page_dewarp/projection.py
 
 import Foundation
+#if SWIFT_PACKAGE
+import OpenCVBridge
+#endif
 
 /// Projects normalized (x, y) coordinates through a cubic warp surface model into image space.
 ///
