@@ -83,6 +83,7 @@ docs/                 Architecture, differences from Python, development process
 
 ## Documentation
 
+- [API Reference](docs/API.md) -- public API, configuration options, usage modes
 - [Architecture](docs/architecture.md) -- pipeline diagram, module responsibilities
 - [Differences from Python](docs/differences.md) -- what changed and why
 - [Development Process](docs/development-process.md) -- how this port was built by an autonomous agent loop
