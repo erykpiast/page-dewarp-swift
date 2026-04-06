@@ -92,6 +92,14 @@ NS_ASSUME_NONNULL_BEGIN
                            width:(NSInteger)outWidth
                           height:(NSInteger)outHeight;
 
+/// Remap a grayscale image using raw float32 coordinate maps. Avoids NSNumber boxing.
+/// mapXData/mapYData: raw bytes of float32 values (row-major, count = outWidth * outHeight)
++ (nullable UIImage *)remapImageData:(UIImage *)image
+                            mapXData:(NSData *)mapXData
+                            mapYData:(NSData *)mapYData
+                               width:(NSInteger)outWidth
+                              height:(NSInteger)outHeight;
+
 /// Apply adaptive mean thresholding to a grayscale image.
 /// Ported from dewarp.py: cv2.adaptiveThreshold(remapped, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, blockSize, C)
 + (nullable UIImage *)adaptiveThresholdImage:(UIImage *)grayImage
@@ -116,6 +124,15 @@ NS_ASSUME_NONNULL_BEGIN
                                        srcHeight:(NSInteger)srcHeight
                                         dstWidth:(NSInteger)dstWidth
                                        dstHeight:(NSInteger)dstHeight;
+
+/// Resize a flat float32 coordinate map using INTER_CUBIC. Avoids NSNumber boxing.
+/// srcData: raw bytes of float32 values (row-major, count = srcWidth * srcHeight)
+/// Returns NSData of float32 values (row-major, count = dstWidth * dstHeight)
++ (nullable NSData *)resizeFloatMapData:(NSData *)srcData
+                               srcWidth:(NSInteger)srcWidth
+                              srcHeight:(NSInteger)srcHeight
+                               dstWidth:(NSInteger)dstWidth
+                              dstHeight:(NSInteger)dstHeight;
 
 /// Compute the maximum column thickness of a contour using a tight binary mask.
 /// Matches Python's tight_mask.sum(axis=0).max() check in contours.py:231.

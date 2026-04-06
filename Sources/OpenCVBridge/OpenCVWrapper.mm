@@ -397,6 +397,31 @@ static UIImage *UIImageFromBGRMat(const cv::Mat &bgrMat) {
     }
 }
 
+/// Remap a grayscale image using raw float32 coordinate maps. Avoids NSNumber boxing.
++ (nullable UIImage *)remapImageData:(UIImage *)image
+                            mapXData:(NSData *)mapXData
+                            mapYData:(NSData *)mapYData
+                               width:(NSInteger)outWidth
+                              height:(NSInteger)outHeight {
+    @autoreleasepool {
+        cv::Mat gray = cvGrayMatFromUIImage(image);
+
+        int h = (int)outHeight;
+        int w = (int)outWidth;
+
+        // Build cv::Mat directly from raw float bytes — no NSNumber boxing
+        const float *xFloats = (const float *)mapXData.bytes;
+        const float *yFloats = (const float *)mapYData.bytes;
+        cv::Mat mX(h, w, CV_32F, (void *)xFloats);
+        cv::Mat mY(h, w, CV_32F, (void *)yFloats);
+
+        cv::Mat remapped;
+        cv::remap(gray, remapped, mX, mY, cv::INTER_CUBIC, cv::BORDER_REPLICATE);
+
+        return UIImageFromGrayMat(remapped);
+    }
+}
+
 /// Ported from dewarp.py:130-137
 /// cv2.adaptiveThreshold(remapped, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, blockSize, C)
 + (nullable UIImage *)adaptiveThresholdImage:(UIImage *)grayImage
@@ -479,6 +504,30 @@ static UIImage *UIImageFromBGRMat(const cv::Mat &bgrMat) {
             [result addObject:@(dst.at<float>(i))];
         }
         return [result copy];
+    }
+}
+
+/// Resize a flat float32 coordinate map using INTER_CUBIC. Avoids NSNumber boxing.
+/// srcData: raw bytes of float32 values (row-major, count = srcWidth * srcHeight)
+/// Returns NSData of float32 values (row-major, count = dstWidth * dstHeight)
++ (nullable NSData *)resizeFloatMapData:(NSData *)srcData
+                               srcWidth:(NSInteger)srcWidth
+                              srcHeight:(NSInteger)srcHeight
+                               dstWidth:(NSInteger)dstWidth
+                              dstHeight:(NSInteger)dstHeight {
+    @autoreleasepool {
+        int sw = (int)srcWidth, sh = (int)srcHeight;
+        int dw = (int)dstWidth, dh = (int)dstHeight;
+
+        // Build cv::Mat directly from raw float bytes — no NSNumber boxing
+        const float *srcFloats = (const float *)srcData.bytes;
+        cv::Mat src(sh, sw, CV_32F, (void *)srcFloats);
+
+        cv::Mat dst;
+        cv::resize(src, dst, cv::Size(dw, dh), 0, 0, cv::INTER_CUBIC);
+
+        // Return raw float bytes — no NSNumber boxing
+        return [NSData dataWithBytes:dst.data length:(NSUInteger)(dw * dh * sizeof(float))];
     }
 }
 

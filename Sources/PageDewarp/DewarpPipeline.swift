@@ -38,6 +38,16 @@ public class DewarpPipeline {
         case lbfgsb
     }
 
+    // MARK: - Timing breakdown
+
+    /// Timing breakdown for each phase of the pipeline.
+    struct TimingBreakdown {
+        var preOptimization: TimeInterval   // image load → initial params
+        var optimizer: TimeInterval         // lbfgsbMinimize / powellMinimize only
+        var postOptimization: TimeInterval  // page dims + remap
+        var total: TimeInterval { preOptimization + optimizer + postOptimization }
+    }
+
     // MARK: - Public API
 
     /// Run the full dewarp pipeline on a UIImage.
@@ -152,6 +162,88 @@ public class DewarpPipeline {
         let remap = RemappedImage(img: image, pageDims: pageDims, pvec: params)
         return .success(remap.outputImage)
     }
+
+    /// Run the full dewarp pipeline and return timing breakdown for each phase.
+    ///
+    /// Identical to `process(image:method:)` but also records wall-clock time for:
+    /// - pre-optimization (steps 1–11)
+    /// - optimizer-only (step 12)
+    /// - post-optimization (steps 13–15)
+    ///
+    /// Used by performance tests to isolate optimizer overhead from pipeline overhead.
+    static func processWithTimingBreakdown(
+        image: UIImage,
+        method: OptimizationMethod = .powell
+    ) -> (result: Result<UIImage, DewarpError>, timing: TimingBreakdown) {
+        let t0 = CFAbsoluteTimeGetCurrent()
+
+        let small = resizeToScreen(image: image)
+        let imgH = Int(small.size.height * small.scale)
+        let imgW = Int(small.size.width * small.scale)
+        let shape = (height: imgH, width: imgW)
+
+        let (pagemask, pageOutline) = makePageExtents(shape: shape)
+
+        var contours = detectContours(small: small, pagemask: pagemask, isText: true)
+        var spans = assembleSpans(contours: contours)
+        if spans.count < 3 {
+            let lineContours = detectContours(small: small, pagemask: pagemask, isText: false)
+            let lineSpans = assembleSpans(contours: lineContours)
+            if lineSpans.count > spans.count {
+                contours = lineContours
+                spans = lineSpans
+            }
+        }
+        if spans.isEmpty {
+            return (.failure(.noContoursDetected),
+                    TimingBreakdown(preOptimization: 0, optimizer: 0, postOptimization: 0))
+        }
+
+        let spanPoints = sampleSpans(shape: shape, spans: spans)
+        let (corners, ycoords, xcoords) = keypointsFromSamples(
+            pagemask: shape, pageOutline: pageOutline, spanPoints: spanPoints)
+        let solverResult = getDefaultParams(corners: corners, ycoords: ycoords, xcoords: xcoords)
+        guard case .success(let (roughDims, spanCounts, initialParams)) = solverResult else {
+            return (.failure(.solvePnPFailed),
+                    TimingBreakdown(preOptimization: 0, optimizer: 0, postOptimization: 0))
+        }
+
+        var dstpoints: [[Double]] = [corners[0]]
+        for pts in spanPoints { dstpoints.append(contentsOf: pts) }
+        let keypointIndex = makeKeypointIndex(spanCounts: spanCounts)
+        let objective = makeObjective(
+            dstpoints: dstpoints,
+            keypointIndex: keypointIndex,
+            shearCost: DewarpConfig.shearCost,
+            rvecRange: DewarpConfig.rvecIdx
+        )
+
+        let t1 = CFAbsoluteTimeGetCurrent()
+
+        let optResult: OptimizeResult
+        switch method {
+        case .powell:
+            optResult = powellMinimize(objective: objective, x0: initialParams)
+        case .lbfgsb:
+            optResult = lbfgsbMinimize(objective: objective, x0: initialParams)
+        }
+        let params = optResult.x
+
+        let t2 = CFAbsoluteTimeGetCurrent()
+
+        var pageDims = getPageDims(corners: corners, roughDims: roughDims, params: params)
+        if pageDims[0] < 0 || pageDims[1] < 0 { pageDims = [roughDims.0, roughDims.1] }
+        let remap = RemappedImage(img: image, pageDims: pageDims, pvec: params)
+
+        let t3 = CFAbsoluteTimeGetCurrent()
+
+        let timing = TimingBreakdown(
+            preOptimization: t1 - t0,
+            optimizer: t2 - t1,
+            postOptimization: t3 - t2
+        )
+        return (.success(remap.outputImage), timing)
+    }
 }
 
 // MARK: - Private helpers
@@ -236,7 +328,7 @@ private func getPageDims(
 
     let dimObjective: ([Double]) -> Double = { dimsLocal in
         // Ported from image.py:59-61
-        let projBR = projectXY(xyCoords: [dimsLocal], pvec: params)
+        let projBR = projectXYPure(xyCoords: [dimsLocal], pvec: params)
         let dx = dstBR[0] - projBR[0][0]
         let dy = dstBR[1] - projBR[0][1]
         return dx * dx + dy * dy

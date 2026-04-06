@@ -59,43 +59,41 @@ struct RemappedImage {
         let pageYRange = linspace(0.0, pageDims[1], hSmall)
 
         // Ported from dewarp.py:92-98 — meshgrid → flatten
-        // np.meshgrid(x_range, y_range) produces x varying along columns, y along rows.
-        // Flattened row-major: outer loop = rows (y), inner loop = cols (x).
-        var pageXYCoords: [[Double]] = []
-        pageXYCoords.reserveCapacity(hSmall * wSmall)
+        // Build flat xs/ys arrays (no per-point heap allocations) instead of [[Double]].
+        // np.meshgrid(x_range, y_range): x varies along columns, y along rows (row-major).
+        let totalSmall = hSmall * wSmall
+        var pageXFlat = [Double](repeating: 0, count: totalSmall)
+        var pageYFlat = [Double](repeating: 0, count: totalSmall)
+        var idx = 0
         for iy in 0..<hSmall {
             for ix in 0..<wSmall {
-                pageXYCoords.append([pageXRange[ix], pageYRange[iy]])
+                pageXFlat[idx] = pageXRange[ix]
+                pageYFlat[idx] = pageYRange[iy]
+                idx += 1
             }
         }
 
-        // Ported from dewarp.py:100-103 — project and convert to pixel coords
-        let imagePoints = projectXY(xyCoords: pageXYCoords, pvec: pvec)
-        let imagePixelPoints = norm2pix(shape: imgShape, pts: imagePoints, asInteger: false)
-
-        // Extract flat float maps for x and y (row-major order)
-        var mapXSmall: [NSNumber] = []
-        var mapYSmall: [NSNumber] = []
-        mapXSmall.reserveCapacity(hSmall * wSmall)
-        mapYSmall.reserveCapacity(hSmall * wSmall)
-        for pt in imagePixelPoints {
-            mapXSmall.append(NSNumber(value: Float(pt[0])))
-            mapYSmall.append(NSNumber(value: Float(pt[1])))
-        }
+        // Ported from dewarp.py:100-103 — project + norm2pix in one pass, output as Float
+        // projectXYBulk avoids [[Double]] allocations and inlines norm2pix conversion.
+        let (mapXFloats, mapYFloats) = projectXYBulk(
+            xs: pageXFlat, ys: pageYFlat, pvec: pvec, shape: imgShape
+        )
+        let mapXSmallData = Data(bytes: mapXFloats, count: totalSmall * MemoryLayout<Float>.size)
+        let mapYSmallData = Data(bytes: mapYFloats, count: totalSmall * MemoryLayout<Float>.size)
 
         // Ported from dewarp.py:105-114 — resize coordinate maps to full output resolution
-        let mapXFull = OpenCVWrapper.resizeFloatMap(
-            mapXSmall, srcWidth: wSmall, srcHeight: hSmall,
+        let mapXFullData = OpenCVWrapper.resizeFloatMapData(
+            mapXSmallData, srcWidth: wSmall, srcHeight: hSmall,
             dstWidth: outWidth, dstHeight: outHeight
         )!
-        let mapYFull = OpenCVWrapper.resizeFloatMap(
-            mapYSmall, srcWidth: wSmall, srcHeight: hSmall,
+        let mapYFullData = OpenCVWrapper.resizeFloatMapData(
+            mapYSmallData, srcWidth: wSmall, srcHeight: hSmall,
             dstWidth: outWidth, dstHeight: outHeight
         )!
 
         // Ported from dewarp.py:116-125 — remap the grayscale image
-        let remapped = OpenCVWrapper.remapImage(
-            img, mapX: mapXFull, mapY: mapYFull,
+        let remapped = OpenCVWrapper.remapImageData(
+            img, mapXData: mapXFullData, mapYData: mapYFullData,
             width: outWidth, height: outHeight
         )!
 

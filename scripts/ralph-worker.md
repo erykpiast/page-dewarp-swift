@@ -4,24 +4,27 @@ You are a worker agent in an autonomous implement-evaluate-fix loop. Your job is
 
 ## Project Context
 
-This is an iOS/Swift port of the Python `page-dewarp` library. The current goal is to make Swift's L-BFGS-B optimizer converge to the same result as Python's L-BFGS-B.
+This is an iOS/Swift port of the Python `page-dewarp` library. The current goal is to optimize Swift pipeline performance to match Python's speed while preserving correctness.
 
-Key findings from prior work:
-- Powell optimizer works correctly — Swift matches Python Powell output
-- Swift has both optimizers: `DewarpPipeline.process(image:method:)` with `.powell` or `.lbfgsb`
-- The analytical gradient in AnalyticalGradient.swift is confirmed correct (< 1e-4 vs finite differences)
-- BUT Swift L-BFGS-B converges to a different local minimum than Python L-BFGS-B:
-  - Python L-BFGS-B: rvec[0]≈0.053, pageDims 1.43x2.20
-  - Swift L-BFGS-B: rvec[0]≈0.184, pageDims 1.60x3.06
-- The L-BFGS-B C library (Sources/CLBFGSB/) is a different implementation from scipy's Fortran code
-- Objective function is verified correct (matches Python value at initial params)
+Key context:
+- Both optimizers work: `DewarpPipeline.process(image:method:)` with `.powell` or `.lbfgsb`
+- L-BFGS-B correctness achieved: FD gradients + scipy-matching hyperparameters (maxcor=10, maxfun=15000)
+- Current L-BFGS-B timing: Swift ~5.87s vs Python ~0.47s on IMG_1389 (~12x slower)
+- Two bottlenecks:
+  1. OpenCV bridge: projectXY crosses ObjC bridge ~3M times per optimization (NSNumber boxing/unboxing)
+  2. Scalar loops: per-point polynomial eval, rotation, projection not vectorized
+- PureProjection.swift already has pure Swift Rodrigues + pinhole projection math
+- AnalyticalGradient.swift has correct analytical gradients (verified < 1e-4 vs FD)
+- Apple Accelerate framework (vDSP, cblas_*) available for vectorization
+
+CRITICAL: Do NOT change optimization results. Output dimensions must remain identical.
 
 Python source is at: `/opt/homebrew/lib/python3.14/site-packages/page_dewarp/`
 Key Python files: `projection.py`, `solve.py`, `image.py`, `optimise/_scipy.py`, `optimise/_base.py`, `keypoints.py`
 
-## Debug Output
+## Benchmark Output
 
-**IMPORTANT**: Save ALL debug output, traces, comparison reports, and intermediate files to `~/Desktop/lbfgsb-debug/`. Create the directory if it doesn't exist (`mkdir -p ~/Desktop/lbfgsb-debug/`). The user monitors this directory for progress.
+**IMPORTANT**: Save output images to `~/Desktop/perf-optimization/` so the user can visually inspect them. Analysis docs, benchmark logs, and intermediate files go to `/tmp/perf-optimization/` or the repo's `scripts/` directory.
 
 ## Available Skills
 
@@ -54,7 +57,7 @@ Don't hesitate to use these if the task involves non-obvious decisions.
    - Use Double (float64) for all numerical computation
    - Use the OpenCV bridge pattern for OpenCV calls (ObjC++ wrapper)
    - Reference the Python source with inline comments: `// Ported from projection.py:36-47`
-   - Save all debug/trace/comparison output to `~/Desktop/lbfgsb-debug/`
+   - Save output images to `~/Desktop/perf-optimization/`, analysis/logs to `/tmp/perf-optimization/`
    - When comparing Swift vs Python behavior, use the comparison script or test infrastructure
 
 7. **Verify**: Build and test:

@@ -114,6 +114,40 @@ func rodrigues(_ rvec: [Double]) -> (R: [Double], dR_dr: [Double]) {
     return (R, dR)
 }
 
+// MARK: - Rotation Only (no Jacobian)
+
+/// Convert a rotation vector to a 3×3 rotation matrix without computing the Jacobian.
+///
+/// Faster than rodrigues() when the Jacobian is not needed (e.g., objective evaluation).
+/// Skips the 27-element dR_dr computation entirely.
+///
+/// - Parameter rvec: 3-element rotation vector [r1, r2, r3].
+/// - Returns: 9-element flat rotation matrix (row-major).
+func rodriguesRotationOnly(_ rvec: [Double]) -> [Double] {
+    let r1 = rvec[0], r2 = rvec[1], r3 = rvec[2]
+    let theta2 = r1*r1 + r2*r2 + r3*r3
+    let theta = sqrt(theta2)
+
+    if theta < 1e-10 {
+        return [
+            1,   -r3,  r2,
+            r3,   1,  -r1,
+           -r2,   r1,  1
+        ]
+    }
+
+    let c = cos(theta), s = sin(theta)
+    let invTheta = 1.0 / theta
+    let kx = r1 * invTheta, ky = r2 * invTheta, kz = r3 * invTheta
+    let v = 1.0 - c
+
+    return [
+        c + kx*kx*v,       kx*ky*v - kz*s,    kx*kz*v + ky*s,
+        ky*kx*v + kz*s,    c + ky*ky*v,        ky*kz*v - kx*s,
+        kz*kx*v - ky*s,    kz*ky*v + kx*s,     c + kz*kz*v
+    ]
+}
+
 // MARK: - Projection with Jacobians
 
 /// Project N 3D points through the pinhole camera model with analytical Jacobians.
