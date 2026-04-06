@@ -59,29 +59,25 @@ struct RemappedImage {
         let pageYRange = linspace(0.0, pageDims[1], hSmall)
 
         // Ported from dewarp.py:92-98 — meshgrid → flatten
-        // np.meshgrid(x_range, y_range) produces x varying along columns, y along rows.
-        // Flattened row-major: outer loop = rows (y), inner loop = cols (x).
-        var pageXYCoords: [[Double]] = []
-        pageXYCoords.reserveCapacity(hSmall * wSmall)
+        // Build flat xs/ys arrays (no per-point heap allocations) instead of [[Double]].
+        // np.meshgrid(x_range, y_range): x varies along columns, y along rows (row-major).
+        let totalSmall = hSmall * wSmall
+        var pageXFlat = [Double](repeating: 0, count: totalSmall)
+        var pageYFlat = [Double](repeating: 0, count: totalSmall)
+        var idx = 0
         for iy in 0..<hSmall {
             for ix in 0..<wSmall {
-                pageXYCoords.append([pageXRange[ix], pageYRange[iy]])
+                pageXFlat[idx] = pageXRange[ix]
+                pageYFlat[idx] = pageYRange[iy]
+                idx += 1
             }
         }
 
-        // Ported from dewarp.py:100-103 — project and convert to pixel coords
-        // Using projectXYPure (pure Swift, identical math, avoids ObjC bridge overhead)
-        let imagePoints = projectXYPure(xyCoords: pageXYCoords, pvec: pvec)
-        let imagePixelPoints = norm2pix(shape: imgShape, pts: imagePoints, asInteger: false)
-
-        // Build flat float32 maps without NSNumber boxing
-        let totalSmall = hSmall * wSmall
-        var mapXFloats = [Float](repeating: 0, count: totalSmall)
-        var mapYFloats = [Float](repeating: 0, count: totalSmall)
-        for (i, pt) in imagePixelPoints.enumerated() {
-            mapXFloats[i] = Float(pt[0])
-            mapYFloats[i] = Float(pt[1])
-        }
+        // Ported from dewarp.py:100-103 — project + norm2pix in one pass, output as Float
+        // projectXYBulk avoids [[Double]] allocations and inlines norm2pix conversion.
+        let (mapXFloats, mapYFloats) = projectXYBulk(
+            xs: pageXFlat, ys: pageYFlat, pvec: pvec, shape: imgShape
+        )
         let mapXSmallData = Data(bytes: mapXFloats, count: totalSmall * MemoryLayout<Float>.size)
         let mapYSmallData = Data(bytes: mapYFloats, count: totalSmall * MemoryLayout<Float>.size)
 
