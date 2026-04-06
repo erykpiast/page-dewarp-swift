@@ -328,7 +328,7 @@ private func getPageDims(
 
     let dimObjective: ([Double]) -> Double = { dimsLocal in
         // Ported from image.py:59-61
-        let projBR = projectXY(xyCoords: [dimsLocal], pvec: params)
+        let projBR = projectXYPure(xyCoords: [dimsLocal], pvec: params)
         let dx = dstBR[0] - projBR[0][0]
         let dy = dstBR[1] - projBR[0][1]
         return dx * dx + dy * dy
