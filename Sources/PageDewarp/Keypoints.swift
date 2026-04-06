@@ -54,5 +54,7 @@ func projectKeypoints(pvec: [Double], keypointIndex: [[Int]]) -> [[Double]] {
         [pvec[idx[0]], pvec[idx[1]]]
     }
     xyCoords[0] = [0.0, 0.0]  // first row is origin, ported from keypoints.py:62
-    return projectXY(xyCoords: xyCoords, pvec: pvec)
+    // Use pure-Swift projection (no ObjC bridge) in the optimization hot loop.
+    // The Remapper uses projectXY (OpenCV) directly — this path does not affect it.
+    return projectXYPure(xyCoords: xyCoords, pvec: pvec)
 }
