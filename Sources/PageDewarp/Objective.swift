@@ -96,13 +96,27 @@ func makeObjective(
         vDSP_vmulD(tempPoly, 1, xCoords, 1, &zCoords, 1, nD)
 
         // Camera space: P_cam = R * [x, y, z]^T + t — Ported from projection.py:50-56
-        // Scalar loop over flat arrays: cache-friendly, no [[Double]] allocations.
-        for i in 0..<n {
-            let x = xCoords[i], y = yCoords[i], z = zCoords[i]
-            cx[i] = R[0]*x + R[1]*y + R[2]*z + tx
-            cy[i] = R[3]*x + R[4]*y + R[5]*z + ty
-            cz[i] = R[6]*x + R[7]*y + R[8]*z + tz
-        }
+        // Vectorized with vDSP: eliminates per-point scalar loop.
+        // vDSP_vsmaD(A, strideA, &b_scalar, C, strideC, D, strideD, N): D[i] = A[i]*b + C[i]
+        var r0 = R[0], r1 = R[1], r2 = R[2]
+        var r3 = R[3], r4 = R[4], r5 = R[5]
+        var r6 = R[6], r7 = R[7], r8 = R[8]
+        var txV = tx, tyV = ty, tzV = tz
+        // cx = R[0]*x + R[1]*y + R[2]*z + tx
+        vDSP_vsmulD(xCoords, 1, &r0, &cx, 1, nD)
+        vDSP_vsmaD(yCoords, 1, &r1, cx, 1, &cx, 1, nD)
+        vDSP_vsmaD(zCoords, 1, &r2, cx, 1, &cx, 1, nD)
+        vDSP_vsaddD(cx, 1, &txV, &cx, 1, nD)
+        // cy = R[3]*x + R[4]*y + R[5]*z + ty
+        vDSP_vsmulD(xCoords, 1, &r3, &cy, 1, nD)
+        vDSP_vsmaD(yCoords, 1, &r4, cy, 1, &cy, 1, nD)
+        vDSP_vsmaD(zCoords, 1, &r5, cy, 1, &cy, 1, nD)
+        vDSP_vsaddD(cy, 1, &tyV, &cy, 1, nD)
+        // cz = R[6]*x + R[7]*y + R[8]*z + tz
+        vDSP_vsmulD(xCoords, 1, &r6, &cz, 1, nD)
+        vDSP_vsmaD(yCoords, 1, &r7, cz, 1, &cz, 1, nD)
+        vDSP_vsmaD(zCoords, 1, &r8, cz, 1, &cz, 1, nD)
+        vDSP_vsaddD(cz, 1, &tzV, &cz, 1, nD)
 
         // iz = 1 / cz — Ported from projection.py:52
         // vDSP_svdivD(scalar, vector, stride, output, stride, n): output[i] = scalar / vector[i]
