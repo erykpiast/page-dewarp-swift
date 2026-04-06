@@ -2,8 +2,6 @@
 // Ported from src/page_dewarp/projection.py
 
 import Foundation
-import Accelerate
-import simd
 #if SWIFT_PACKAGE
 import OpenCVBridge
 #endif
@@ -29,82 +27,37 @@ func projectXYPure(xyCoords: [[Double]], pvec: [Double]) -> [[Double]] {
 
     // Cubic polynomial coefficients: poly = [alpha+beta, -2*alpha-beta, alpha, 0]
     // Ported from projection.py:44-47
-    var a = alpha + beta
-    var b = -2 * alpha - beta
-    var c = alpha
+    let a = alpha + beta
+    let b = -2 * alpha - beta
+    let c = alpha
 
     guard !xyCoords.isEmpty else { return [] }
 
     let rvec = Array(pvec[DewarpConfig.rvecIdx])
     let tvec = Array(pvec[DewarpConfig.tvecIdx])
-    var fLocal = DewarpConfig.focalLength
+    let f = DewarpConfig.focalLength
 
     // Rodrigues rotation (pure Swift, matches OpenCV cv::Rodrigues exactly)
     let (R, _) = rodrigues(rvec)
     let tx = tvec[0], ty = tvec[1], tz = tvec[2]
 
-    let n = xyCoords.count
-    let nD = vDSP_Length(n)
+    var result = [[Double]](repeating: [0.0, 0.0], count: xyCoords.count)
+    for i in 0..<xyCoords.count {
+        let x = xyCoords[i][0]
+        let y = xyCoords[i][1]
+        // Cubic z from polynomial, d=0 — Ported from projection.py:46-49
+        let z = ((a * x + b) * x + c) * x
 
-    // Extract x and y into flat contiguous arrays for vDSP
-    var xCoords = [Double](repeating: 0.0, count: n)
-    var yCoords = [Double](repeating: 0.0, count: n)
-    for i in 0..<n {
-        xCoords[i] = xyCoords[i][0]
-        yCoords[i] = xyCoords[i][1]
-    }
+        // Rotate + translate: P_cam = R * [x, y, z]^T + t
+        let cx = R[0]*x + R[1]*y + R[2]*z + tx
+        let cy = R[3]*x + R[4]*y + R[5]*z + ty
+        let cz = R[6]*x + R[7]*y + R[8]*z + tz
 
-    // Cubic z-coords via Horner's method using vDSP — Ported from projection.py:46-49
-    // z = ((cubicA*x + cubicB)*x + cubicC)*x
-    var zCoords  = [Double](repeating: 0.0, count: n)
-    var tempPoly = [Double](repeating: 0.0, count: n)
-    vDSP_vsmsaD(xCoords, 1, &a, &b, &tempPoly, 1, nD)   // tempPoly = a*x + b
-    vDSP_vmulD(tempPoly, 1, xCoords, 1, &tempPoly, 1, nD) // tempPoly = tempPoly * x
-    vDSP_vsaddD(tempPoly, 1, &c, &tempPoly, 1, nD)         // tempPoly = tempPoly + c
-    vDSP_vmulD(tempPoly, 1, xCoords, 1, &zCoords, 1, nD)  // z = tempPoly * x
-
-    // Camera space: P_cam = R * [x, y, z]^T + t — Ported from projection.py:50-56
-    var cxArr = [Double](repeating: 0.0, count: n)
-    var cyArr = [Double](repeating: 0.0, count: n)
-    var czArr = [Double](repeating: 0.0, count: n)
-    var r0 = R[0], r1 = R[1], r2 = R[2]
-    var r3 = R[3], r4 = R[4], r5 = R[5]
-    var r6 = R[6], r7 = R[7], r8 = R[8]
-    var txV = tx, tyV = ty, tzV = tz
-    // cx = R[0]*x + R[1]*y + R[2]*z + tx
-    vDSP_vsmulD(xCoords, 1, &r0, &cxArr, 1, nD)
-    vDSP_vsmaD(yCoords, 1, &r1, cxArr, 1, &cxArr, 1, nD)
-    vDSP_vsmaD(zCoords, 1, &r2, cxArr, 1, &cxArr, 1, nD)
-    vDSP_vsaddD(cxArr, 1, &txV, &cxArr, 1, nD)
-    // cy = R[3]*x + R[4]*y + R[5]*z + ty
-    vDSP_vsmulD(xCoords, 1, &r3, &cyArr, 1, nD)
-    vDSP_vsmaD(yCoords, 1, &r4, cyArr, 1, &cyArr, 1, nD)
-    vDSP_vsmaD(zCoords, 1, &r5, cyArr, 1, &cyArr, 1, nD)
-    vDSP_vsaddD(cyArr, 1, &tyV, &cyArr, 1, nD)
-    // cz = R[6]*x + R[7]*y + R[8]*z + tz
-    vDSP_vsmulD(xCoords, 1, &r6, &czArr, 1, nD)
-    vDSP_vsmaD(yCoords, 1, &r7, czArr, 1, &czArr, 1, nD)
-    vDSP_vsmaD(zCoords, 1, &r8, czArr, 1, &czArr, 1, nD)
-    vDSP_vsaddD(czArr, 1, &tzV, &czArr, 1, nD)
-
-    // iz = 1 / cz — Ported from projection.py:52
-    var iz = [Double](repeating: 0.0, count: n)
-    var one = 1.0
-    vDSP_svdivD(&one, czArr, 1, &iz, 1, nD)
-
-    // u = f * cx * iz, v = f * cy * iz — Ported from projection.py:53-56
-    var uCoords = [Double](repeating: 0.0, count: n)
-    var vCoords = [Double](repeating: 0.0, count: n)
-    vDSP_vmulD(cxArr, 1, iz, 1, &uCoords, 1, nD)
-    vDSP_vsmulD(uCoords, 1, &fLocal, &uCoords, 1, nD)
-    vDSP_vmulD(cyArr, 1, iz, 1, &vCoords, 1, nD)
-    vDSP_vsmulD(vCoords, 1, &fLocal, &vCoords, 1, nD)
-
-    // Pack results back into [[Double]]
-    var result = [[Double]](repeating: [0.0, 0.0], count: n)
-    for i in 0..<n {
-        result[i][0] = uCoords[i]
-        result[i][1] = vCoords[i]
+        // Pinhole projection: K = diag(f, f, 1), no distortion, no principal point offset
+        // Ported from projection.py:50-56
+        let iz = 1.0 / cz
+        result[i][0] = f * cx * iz
+        result[i][1] = f * cy * iz
     }
     return result
 }
