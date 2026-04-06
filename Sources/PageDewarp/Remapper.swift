@@ -70,32 +70,34 @@ struct RemappedImage {
         }
 
         // Ported from dewarp.py:100-103 — project and convert to pixel coords
-        let imagePoints = projectXY(xyCoords: pageXYCoords, pvec: pvec)
+        // Using projectXYPure (pure Swift, identical math, avoids ObjC bridge overhead)
+        let imagePoints = projectXYPure(xyCoords: pageXYCoords, pvec: pvec)
         let imagePixelPoints = norm2pix(shape: imgShape, pts: imagePoints, asInteger: false)
 
-        // Extract flat float maps for x and y (row-major order)
-        var mapXSmall: [NSNumber] = []
-        var mapYSmall: [NSNumber] = []
-        mapXSmall.reserveCapacity(hSmall * wSmall)
-        mapYSmall.reserveCapacity(hSmall * wSmall)
-        for pt in imagePixelPoints {
-            mapXSmall.append(NSNumber(value: Float(pt[0])))
-            mapYSmall.append(NSNumber(value: Float(pt[1])))
+        // Build flat float32 maps without NSNumber boxing
+        let totalSmall = hSmall * wSmall
+        var mapXFloats = [Float](repeating: 0, count: totalSmall)
+        var mapYFloats = [Float](repeating: 0, count: totalSmall)
+        for (i, pt) in imagePixelPoints.enumerated() {
+            mapXFloats[i] = Float(pt[0])
+            mapYFloats[i] = Float(pt[1])
         }
+        let mapXSmallData = Data(bytes: mapXFloats, count: totalSmall * MemoryLayout<Float>.size)
+        let mapYSmallData = Data(bytes: mapYFloats, count: totalSmall * MemoryLayout<Float>.size)
 
         // Ported from dewarp.py:105-114 — resize coordinate maps to full output resolution
-        let mapXFull = OpenCVWrapper.resizeFloatMap(
-            mapXSmall, srcWidth: wSmall, srcHeight: hSmall,
+        let mapXFullData = OpenCVWrapper.resizeFloatMapData(
+            mapXSmallData, srcWidth: wSmall, srcHeight: hSmall,
             dstWidth: outWidth, dstHeight: outHeight
         )!
-        let mapYFull = OpenCVWrapper.resizeFloatMap(
-            mapYSmall, srcWidth: wSmall, srcHeight: hSmall,
+        let mapYFullData = OpenCVWrapper.resizeFloatMapData(
+            mapYSmallData, srcWidth: wSmall, srcHeight: hSmall,
             dstWidth: outWidth, dstHeight: outHeight
         )!
 
         // Ported from dewarp.py:116-125 — remap the grayscale image
-        let remapped = OpenCVWrapper.remapImage(
-            img, mapX: mapXFull, mapY: mapYFull,
+        let remapped = OpenCVWrapper.remapImageData(
+            img, mapXData: mapXFullData, mapYData: mapYFullData,
             width: outWidth, height: outHeight
         )!
 
