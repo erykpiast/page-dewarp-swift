@@ -25,7 +25,7 @@ func finiteDifferenceGradient(
     var xp = x
     for i in 0..<n {
         let xi = x[i]
-        let h = max(epsilon, epsilon * abs(xi))
+        let h = epsilon  // absolute step, matching scipy's default
         xp[i] = xi + h
         let fi = objective(xp)
         grad[i] = (fi - f0) / h
@@ -45,21 +45,25 @@ func finiteDifferenceGradient(
 ///   - objective: Scalar objective function `([Double]) -> Double`.
 ///   - x0: Initial parameter vector.
 ///   - maxIter: Maximum number of iterations (default 600,000).
-///   - maxCor: Number of L-BFGS correction pairs (default 100).
+///   - maxCor: Number of L-BFGS correction pairs (default 10, matching scipy).
 ///   - factr: Function value tolerance factor. Iteration stops when
 ///     `(f^k - f^{k+1})/max{|f^k|,|f^{k+1}|,1} <= factr*epsmch`.
 ///     Default `1e7` for moderate accuracy. Use `1e12` for low, `1e1` for high.
 ///   - pgtol: Projected gradient tolerance (default 1e-5).
 ///   - epsilon: Finite difference step size (default 1e-8).
+///   - maxFun: Maximum number of function evaluations (default 15,000, matching scipy).
+///     scipy's default `maxfun=15000` effectively stops early on non-convex problems,
+///     preventing convergence to degenerate basins. Each gradient step costs n+1 evals.
 /// - Returns: Optimization result.
 func lbfgsbMinimize(
     objective: ([Double]) -> Double,
     x0: [Double],
     maxIter: Int = 600_000,
-    maxCor: Int = 100,
+    maxCor: Int = 10,
     factr: Double = 1e7,
     pgtol: Double = 1e-5,
-    epsilon: Double = 1e-8
+    epsilon: Double = 1e-8,
+    maxFun: Int = 15_000
 ) -> OptimizeResult {
     let n = x0.count
 
@@ -105,6 +109,9 @@ func lbfgsbMinimize(
 
     // Reverse-communication loop
     for _ in 0..<(maxIter + 1) {
+        // Stop if we've exceeded the function evaluation budget (matches scipy maxfun=15000)
+        if nfev >= maxFun { break }
+
         setulb(&nVar, &mVar, &x, &l, &u, &nbd,
                &f, &g, &factrVar, &pgtolVar,
                &wa, &iwa, &task, &iprint,
@@ -147,7 +154,7 @@ func lbfgsbMinimize(
 ///   - objectiveAndGradient: Returns `(f, grad)` for a given parameter vector.
 ///   - x0: Initial parameter vector.
 ///   - maxIter: Maximum number of iterations (default 600,000).
-///   - maxCor: Number of L-BFGS correction pairs (default 100).
+///   - maxCor: Number of L-BFGS correction pairs (default 10, matching scipy).
 ///   - factr: Function value tolerance factor (default 1e7).
 ///   - pgtol: Projected gradient tolerance (default 1e-5).
 /// - Returns: Optimization result.
@@ -155,7 +162,7 @@ func lbfgsbMinimize(
     objectiveAndGradient: ([Double]) -> (f: Double, grad: [Double]),
     x0: [Double],
     maxIter: Int = 600_000,
-    maxCor: Int = 100,
+    maxCor: Int = 10,
     factr: Double = 1e7,
     pgtol: Double = 1e-5
 ) -> OptimizeResult {

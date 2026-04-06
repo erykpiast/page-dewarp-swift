@@ -32,8 +32,8 @@ WORKER_PROMPT="$SCRIPT_DIR/ralph-worker.md"
 EVALUATOR_PROMPT="$SCRIPT_DIR/ralph-evaluator.md"
 
 # Defaults
-MAX_CYCLES=50
-NUM_WORKERS=3
+MAX_CYCLES=20
+NUM_WORKERS=2
 BUDGET_PER_RUN=5.00
 CYCLE=0
 MODEL="sonnet"  # Use sonnet for workers (fast + capable), opus for evaluator

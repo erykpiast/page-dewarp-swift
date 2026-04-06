@@ -26,15 +26,32 @@ public class DewarpPipeline {
         case invalidPageDimensions
     }
 
+    /// Optimization method for parameter fitting.
+    /// Ported from Python's `OPT_METHOD` config / `-m` CLI flag.
+    public enum OptimizationMethod {
+        /// Powell's conjugate direction method (derivative-free).
+        /// Default — matches Python's default and finds the correct basin
+        /// on the non-convex page dewarping objective.
+        case powell
+        /// L-BFGS-B with finite-difference gradients, matching Python's scipy.minimize(method='L-BFGS-B')
+        /// which does not pass a jacobian. Uses the same basin as Python for correct convergence.
+        case lbfgsb
+    }
+
     // MARK: - Public API
 
     /// Run the full dewarp pipeline on a UIImage.
     ///
     /// Ported from image.py:79-137 (WarpedImage.__init__)
     ///
-    /// - Parameter image: Input page photo (any orientation, any scale).
+    /// - Parameters:
+    ///   - image: Input page photo (any orientation, any scale).
+    ///   - method: Optimization method to use. Default is `.powell`.
     /// - Returns: `.success(UIImage)` with the dewarped output, or `.failure(DewarpError)`.
-    public static func process(image: UIImage) -> Result<UIImage, DewarpError> {
+    public static func process(
+        image: UIImage,
+        method: OptimizationMethod = .powell
+    ) -> Result<UIImage, DewarpError> {
         // Step 1: resize to screen size if needed.
         // Ported from image.py:92-96 via resize_to_screen
         let small = resizeToScreen(image: image)
@@ -107,15 +124,17 @@ public class DewarpPipeline {
             rvecRange: DewarpConfig.rvecIdx
         )
 
-        // Step 12: run L-BFGS-B optimizer with analytical gradient.
-        // Ported from image.py:123-130 → optimise_params
-        let gradObjective: ([Double]) -> (f: Double, grad: [Double]) = { pvec in
-            objectiveAndGradient(
-                pvec: pvec, dstpoints: dstpoints, keypointIndex: keypointIndex,
-                shearCost: DewarpConfig.shearCost, focalLength: DewarpConfig.focalLength
-            )
+        // Step 12: run optimizer.
+        // Ported from image.py:123-130 → optimise_params, dispatched by method.
+        let optResult: OptimizeResult
+        switch method {
+        case .powell:
+            optResult = powellMinimize(objective: objective, x0: initialParams)
+        case .lbfgsb:
+            // Use FD gradients to match Python scipy.minimize(method='L-BFGS-B'),
+            // which does not pass a jacobian — confirmed root cause of basin divergence.
+            optResult = lbfgsbMinimize(objective: objective, x0: initialParams)
         }
-        let optResult = lbfgsbMinimize(objectiveAndGradient: gradObjective, x0: initialParams)
         let params = optResult.x
 
         // Step 13: optimize page dimensions.
