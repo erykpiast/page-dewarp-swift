@@ -20,7 +20,7 @@ The pipeline detects curved text lines in a page photo, fits a 3D cubic surface 
 2. **Detect** text contours via adaptive thresholding + morphology
 3. **Assemble** contours into horizontal spans
 4. **Sample** keypoints along each span
-5. **Estimate** initial 3D pose via `solvePnP`
+5. **Estimate** initial 3D pose via pure-Swift DLT (Direct Linear Transform)
 6. **Optimize** cubic surface parameters (L-BFGS-B with analytical gradients)
 7. **Remap** the original image through the optimized surface model
 8. **Threshold** the result into a clean binary image
@@ -60,6 +60,22 @@ case .failure(let error):
     print("Dewarping failed: \(error)")
 }
 ```
+
+## Integration
+
+### CocoaPods
+
+Add to your `Podfile`:
+
+```ruby
+pod 'PageDewarp', '~> 2.0'
+```
+
+`opencv-rne` is pulled in automatically as a peer dependency. The library only requires OpenCV's `core` and `imgproc` modules — `calib3d` is not needed.
+
+### Swift Package Manager
+
+SPM support requires that the consumer provides OpenCV as a binary target (see `Package.swift` for the expected target name `opencv2`).
 
 ## Running Tests
 

@@ -35,7 +35,7 @@ Input UIImage
        |
        v
   +-----------+
-  |  Initial  |  Solver.swift (solvePnP via OpenCVWrapper)
+  |  Initial  |  Solver.swift + SolvePnPDLT.swift (pure-Swift DLT)
   |  Params   |
   +-----------+
        |
@@ -77,8 +77,9 @@ Input UIImage
 
 | File | Python equivalent | Responsibility |
 |------|------------------|----------------|
-| `Projection.swift` | `projection.py` | Cubic polynomial surface model, 3D-to-2D projection via OpenCV |
-| `Solver.swift` | `solve.py` | Initial parameter estimation via `solvePnP` |
+| `Projection.swift` | `projection.py` | Cubic polynomial surface model, pure-Swift 3D-to-2D projection |
+| `Solver.swift` | `solve.py` | Initial parameter estimation (assembles params, calls solvePnPPlanar) |
+| `SolvePnPDLT.swift` | (OpenCV calib3d) | Pure-Swift solvePnP via DLT homography + decomposition using LAPACK |
 | `Objective.swift` | `optimise/_base.py` | Builds the least-squares objective function for optimization |
 | `PowellOptimizer.swift` | SciPy's `_optimize.py` | Powell's conjugate direction method with Brent's line search |
 | `CameraMatrix.swift` | `projection.py` | Camera intrinsic matrix construction |
@@ -111,10 +112,10 @@ UIImage  <--  CGBitmapContext  <--  cv::Mat
 Key bridge methods:
 - `findContoursInGrayImage:` -- contour detection
 - `computeDetectionMask:pagemask:isText:adaptiveWinsz:` -- full mask pipeline
-- `solvePnPWithObjectPoints:imagePoints:cameraMatrix:distCoeffs:` -- pose estimation
-- `projectPointsWith3DPoints:rvec:tvec:cameraMatrix:distCoeffs:` -- 3D projection
 - `remapImage:mapX:mapY:width:height:` -- image warping
 - `adaptiveThresholdImage:maxValue:blockSize:C:` -- binarization
+
+Pose estimation (`solvePnP`) and 3D projection (`projectPoints`) are implemented in pure Swift (`SolvePnPDLT.swift`, `Projection.swift`) using LAPACK via the Accelerate framework. The bridge requires only OpenCV's `core` and `imgproc` modules — `calib3d` is not a dependency.
 
 ## Parameter Vector Layout
 
@@ -143,4 +144,4 @@ where:
   c = alpha
 ```
 
-This maps each (x, y) page coordinate to a 3D point (x, y, z), which is then projected to 2D via OpenCV's `projectPoints` using the camera matrix and pose (rvec, tvec).
+This maps each (x, y) page coordinate to a 3D point (x, y, z), which is then projected to 2D via the pure-Swift `projectAndDifferentiate` function using the camera matrix and pose (rvec, tvec).
