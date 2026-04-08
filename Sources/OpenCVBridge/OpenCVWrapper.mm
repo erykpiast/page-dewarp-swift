@@ -422,6 +422,29 @@ static UIImage *UIImageFromBGRMat(const cv::Mat &bgrMat) {
     }
 }
 
++ (nullable UIImage *)remapColorImageData:(UIImage *)image
+                                 mapXData:(NSData *)mapXData
+                                 mapYData:(NSData *)mapYData
+                                    width:(NSInteger)outWidth
+                                   height:(NSInteger)outHeight {
+    @autoreleasepool {
+        cv::Mat bgr = cvMatFromUIImage(image);
+
+        int h = (int)outHeight;
+        int w = (int)outWidth;
+
+        const float *xFloats = (const float *)mapXData.bytes;
+        const float *yFloats = (const float *)mapYData.bytes;
+        cv::Mat mX(h, w, CV_32F, (void *)xFloats);
+        cv::Mat mY(h, w, CV_32F, (void *)yFloats);
+
+        cv::Mat remapped;
+        cv::remap(bgr, remapped, mX, mY, cv::INTER_CUBIC, cv::BORDER_REPLICATE);
+
+        return UIImageFromBGRMat(remapped);
+    }
+}
+
 /// Ported from dewarp.py:130-137
 /// cv2.adaptiveThreshold(remapped, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, blockSize, C)
 + (nullable UIImage *)adaptiveThresholdImage:(UIImage *)grayImage

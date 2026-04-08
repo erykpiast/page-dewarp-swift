@@ -100,6 +100,13 @@ NS_ASSUME_NONNULL_BEGIN
                                width:(NSInteger)outWidth
                               height:(NSInteger)outHeight;
 
+/// Remap a color image using raw float32 coordinate maps. Preserves RGB channels.
++ (nullable UIImage *)remapColorImageData:(UIImage *)image
+                                 mapXData:(NSData *)mapXData
+                                 mapYData:(NSData *)mapYData
+                                    width:(NSInteger)outWidth
+                                   height:(NSInteger)outHeight;
+
 /// Apply adaptive mean thresholding to a grayscale image.
 /// Ported from dewarp.py: cv2.adaptiveThreshold(remapped, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, blockSize, C)
 + (nullable UIImage *)adaptiveThresholdImage:(UIImage *)grayImage

@@ -37,8 +37,9 @@ struct RemappedImage {
     ///   - img: Full-resolution input UIImage (RGB/RGBA).
     ///   - pageDims: [width, height] of the page in normalized units.
     ///   - pvec: Optimized parameter vector (rvec, tvec, cubic coefficients).
+    ///   - noBinary: If true, skip adaptive thresholding and return color output.
     /// Ported from dewarp.py:57-151
-    init(img: UIImage, pageDims: [Double], pvec: [Double]) {
+    init(img: UIImage, pageDims: [Double], pvec: [Double], noBinary: Bool = false) {
         // Pixel dimensions (accounting for screen scale)
         let imgH = Int(img.size.height * img.scale)
         let imgW = Int(img.size.width * img.scale)
@@ -91,16 +92,21 @@ struct RemappedImage {
             dstWidth: outWidth, dstHeight: outHeight
         )!
 
-        // Ported from dewarp.py:116-125 — remap the grayscale image
-        let remapped = OpenCVWrapper.remapImageData(
-            img, mapXData: mapXFullData, mapYData: mapYFullData,
-            width: outWidth, height: outHeight
-        )!
-
-        // Ported from dewarp.py:126-139 — adaptive threshold or passthrough
-        if DewarpConfig.noBinary {
+        // Ported from dewarp.py:116-139 — remap + optional threshold
+        if noBinary {
+            // Color output: remap the full BGR image, skip thresholding
+            let remapped = OpenCVWrapper.remapColorImageData(
+                img, mapXData: mapXFullData, mapYData: mapYFullData,
+                width: outWidth, height: outHeight
+            )!
             self.outputImage = remapped
         } else {
+            // Binary output: convert to grayscale, remap, then threshold
+            // Matches Python's default behavior (cvtColor → remap → adaptiveThreshold)
+            let remapped = OpenCVWrapper.remapImageData(
+                img, mapXData: mapXFullData, mapYData: mapYFullData,
+                width: outWidth, height: outHeight
+            )!
             let threshed = OpenCVWrapper.adaptiveThresholdImage(
                 remapped,
                 maxValue: 255.0,
