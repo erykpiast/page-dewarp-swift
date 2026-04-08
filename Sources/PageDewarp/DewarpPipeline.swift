@@ -38,6 +38,15 @@ public class DewarpPipeline {
         case lbfgsb
     }
 
+    /// Output image mode.
+    /// Corresponds to Python's `NO_BINARY` config flag.
+    public enum OutputMode {
+        /// Full-color dewarped image.
+        case color
+        /// Adaptive-thresholded binary image. Matches Python's default (`NO_BINARY=0`).
+        case binary
+    }
+
     // MARK: - Timing breakdown
 
     /// Timing breakdown for each phase of the pipeline.
@@ -57,10 +66,12 @@ public class DewarpPipeline {
     /// - Parameters:
     ///   - image: Input page photo (any orientation, any scale).
     ///   - method: Optimization method to use. Default is `.powell`.
+    ///   - output: Output image mode. Default is `.color`.
     /// - Returns: `.success(UIImage)` with the dewarped output, or `.failure(DewarpError)`.
     public static func process(
         image: UIImage,
-        method: OptimizationMethod = .powell
+        method: OptimizationMethod = .powell,
+        output: OutputMode = .color
     ) -> Result<UIImage, DewarpError> {
         // Step 1: resize to screen size if needed.
         // Ported from image.py:92-96 via resize_to_screen
@@ -159,7 +170,8 @@ public class DewarpPipeline {
 
         // Step 15: remap image.
         // Ported from image.py:136 → threshold
-        let remap = RemappedImage(img: image, pageDims: pageDims, pvec: params)
+        let noBinary = (output == .color)
+        let remap = RemappedImage(img: image, pageDims: pageDims, pvec: params, noBinary: noBinary)
         return .success(remap.outputImage)
     }
 
@@ -173,7 +185,8 @@ public class DewarpPipeline {
     /// Used by performance tests to isolate optimizer overhead from pipeline overhead.
     static func processWithTimingBreakdown(
         image: UIImage,
-        method: OptimizationMethod = .powell
+        method: OptimizationMethod = .powell,
+        output: OutputMode = .color
     ) -> (result: Result<UIImage, DewarpError>, timing: TimingBreakdown) {
         let t0 = CFAbsoluteTimeGetCurrent()
 
@@ -233,7 +246,8 @@ public class DewarpPipeline {
 
         var pageDims = getPageDims(corners: corners, roughDims: roughDims, params: params)
         if pageDims[0] < 0 || pageDims[1] < 0 { pageDims = [roughDims.0, roughDims.1] }
-        let remap = RemappedImage(img: image, pageDims: pageDims, pvec: params)
+        let noBinary = (output == .color)
+        let remap = RemappedImage(img: image, pageDims: pageDims, pvec: params, noBinary: noBinary)
 
         let t3 = CFAbsoluteTimeGetCurrent()
 
