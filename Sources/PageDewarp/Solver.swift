@@ -2,9 +2,6 @@
 // Ported from src/page_dewarp/solve.py
 
 import Foundation
-#if SWIFT_PACKAGE
-import OpenCVBridge
-#endif
 
 /// Errors produced by the solver.
 enum SolverError: Error {
@@ -35,39 +32,28 @@ func getDefaultParams(
 
     // Build 3D object points of a flat page: TL, TR, BR, BL.
     // Ported from solve.py:42-49
-    let objectPoints: [NSNumber] = [
-        0, 0, 0,
-        NSNumber(value: pageWidth), 0, 0,
-        NSNumber(value: pageWidth), NSNumber(value: pageHeight), 0,
-        0, NSNumber(value: pageHeight), 0,
-    ]
+    let objectPoints: [Double] = [0, 0, 0, pageWidth, 0, 0,
+                                   pageWidth, pageHeight, 0, 0, pageHeight, 0]
 
     // Build 2D image points (corners in normalized image coordinates).
     // Ported from solve.py:51
-    let imagePoints: [NSNumber] = corners.flatMap { pt in
-        [NSNumber(value: pt[0]), NSNumber(value: pt[1])]
-    }
+    let imagePoints: [Double] = corners.flatMap { $0 }
 
     // Camera matrix (focal_length = 1.2).
-    let kFlat = cameraMatrix().flatMap { $0 }.map { NSNumber(value: $0) }
-    let distCoeffs: [NSNumber] = [0, 0, 0, 0, 0]
+    let kFlat: [Double] = cameraMatrix().flatMap { $0 }
 
-    // Solve PnP — estimate rotation and translation.
-    // BUG FIX vs Python: check success flag (Python ignores it).
+    // Solve PnP via pure-Swift DLT — estimate rotation and translation.
     // Ported from solve.py:51
-    let pnpResult = OpenCVWrapper.solvePnP(
-        withObjectPoints: objectPoints,
+    guard let pnpResult = solvePnPPlanar(
+        objectPoints: objectPoints,
         imagePoints: imagePoints,
-        cameraMatrix: kFlat,
-        distCoeffs: distCoeffs
-    )
-
-    guard let success = pnpResult["success"] as? NSNumber, success.boolValue else {
+        cameraMatrix: kFlat
+    ) else {
         return .failure(.solvePnPFailed)
     }
 
-    let rvecArr = (pnpResult["rvec"] as! [NSNumber]).map { $0.doubleValue }
-    let tvecArr = (pnpResult["tvec"] as! [NSNumber]).map { $0.doubleValue }
+    let rvecArr = pnpResult.rvec
+    let tvecArr = pnpResult.tvec
 
     // Assemble parameter vector: [rvec(3), tvec(3), cubic(2), ycoords(N), xcoords(flat)].
     // Ported from solve.py:53-62
