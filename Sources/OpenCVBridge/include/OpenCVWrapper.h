@@ -50,37 +50,6 @@ NS_ASSUME_NONNULL_BEGIN
 /// Ported from spans.py: cv2.convexHull(contour)
 + (NSArray<NSValue *> *)convexHullOfPoints:(NSArray<NSValue *> *)points;
 
-// MARK: - Calibration / projection
-
-/// Solve PnP to find rotation and translation vectors.
-/// objectPoints: flat NSArray [x0,y0,z0, x1,y1,z1, ...] (count = N*3)
-/// imagePoints:  flat NSArray [x0,y0, x1,y1, ...] (count = N*2)
-/// cameraMatrix: flat NSArray of 9 values (3x3 row-major)
-/// distCoeffs:   flat NSArray of 5 values
-/// Returns NSDictionary: "success" (BOOL as NSNumber), "rvec" ([3]), "tvec" ([3])
-/// Ported from normalisation.py: cv2.solvePnP(...)
-+ (NSDictionary *)solvePnPWithObjectPoints:(NSArray<NSNumber *> *)objectPoints
-                               imagePoints:(NSArray<NSNumber *> *)imagePoints
-                              cameraMatrix:(NSArray<NSNumber *> *)cameraMatrix
-                                distCoeffs:(NSArray<NSNumber *> *)distCoeffs;
-
-/// Project 3D points into image space using rvec, tvec, cameraMatrix, distCoeffs.
-/// points3D: flat NSArray [x0,y0,z0, ...] (count = N*3)
-/// rvec, tvec: NSArray of 3 values each
-/// cameraMatrix: 9 values, distCoeffs: 5 values
-/// Returns NSArray of CGPoint NSValues (N projected image points).
-/// Ported from projection.py: cv2.projectPoints(objpoints, rvec, tvec, K, zeros)
-+ (NSArray<NSValue *> *)projectPointsWith3DPoints:(NSArray<NSNumber *> *)points3D
-                                             rvec:(NSArray<NSNumber *> *)rvec
-                                             tvec:(NSArray<NSNumber *> *)tvec
-                                     cameraMatrix:(NSArray<NSNumber *> *)cameraMatrix
-                                       distCoeffs:(NSArray<NSNumber *> *)distCoeffs;
-
-/// Convert a Rodrigues rotation vector (3 elements) to a 3x3 rotation matrix.
-/// Returns NSArray of 9 NSNumbers (row-major).
-/// Ported from normalisation.py: cv2.Rodrigues(rvec)
-+ (NSArray<NSNumber *> *)rodriguesFromVector:(NSArray<NSNumber *> *)rvec;
-
 // MARK: - Image operations
 
 /// Remap a grayscale UIImage using float32 X and Y map arrays.

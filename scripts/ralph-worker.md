@@ -4,27 +4,22 @@ You are a worker agent in an autonomous implement-evaluate-fix loop. Your job is
 
 ## Project Context
 
-This is an iOS/Swift port of the Python `page-dewarp` library. The current goal is to optimize Swift pipeline performance to match Python's speed while preserving correctness.
+This is an iOS/Swift port of the Python `page-dewarp` library. The current goal is to make OpenCV a peer dependency by replacing calib3d functions with pure Swift and adding a CocoaPods podspec.
 
 Key context:
 - Both optimizers work: `DewarpPipeline.process(image:method:)` with `.powell` or `.lbfgsb`
-- L-BFGS-B correctness achieved: FD gradients + scipy-matching hyperparameters (maxcor=10, maxfun=15000)
-- Current L-BFGS-B timing: Swift ~5.87s vs Python ~0.47s on IMG_1389 (~12x slower)
-- Two bottlenecks:
-  1. OpenCV bridge: projectXY crosses ObjC bridge ~3M times per optimization (NSNumber boxing/unboxing)
-  2. Scalar loops: per-point polynomial eval, rotation, projection not vectorized
-- PureProjection.swift already has pure Swift Rodrigues + pinhole projection math
-- AnalyticalGradient.swift has correct analytical gradients (verified < 1e-4 vs FD)
-- Apple Accelerate framework (vDSP, cblas_*) available for vectorization
+- The goal is to replace 3 calib3d functions with pure Swift so the library only needs core+imgproc
+- projectPoints and Rodrigues already have pure-Swift replacements (projectXYPure, projectXYBulk, rodrigues)
+- Only solvePnP needs a new pure-Swift replacement (DLT homography + decomposition)
+- After removing calib3d, add a CocoaPods podspec with `s.dependency 'opencv-rne', '~> 4.11'`
+- The public API does NOT change
+- Spec: `specs/feat-opencv-peer-dependency.md`
+- Task breakdown: `specs/feat-opencv-peer-dependency-tasks.md`
 
-CRITICAL: Do NOT change optimization results. Output dimensions must remain identical.
+CRITICAL: Do NOT change dewarping output. Swift must match Python. Output dimensions must remain identical. PSNR between Swift and Python output must be > 40 dB.
 
 Python source is at: `/opt/homebrew/lib/python3.14/site-packages/page_dewarp/`
 Key Python files: `projection.py`, `solve.py`, `image.py`, `optimise/_scipy.py`, `optimise/_base.py`, `keypoints.py`
-
-## Benchmark Output
-
-**IMPORTANT**: Save output images to `~/Desktop/perf-optimization/` so the user can visually inspect them. Analysis docs, benchmark logs, and intermediate files go to `/tmp/perf-optimization/` or the repo's `scripts/` directory.
 
 ## Available Skills
 
@@ -56,9 +51,9 @@ Don't hesitate to use these if the task involves non-obvious decisions.
 6. **Implement the task**: Follow the details exactly. Key rules:
    - Use Double (float64) for all numerical computation
    - Use the OpenCV bridge pattern for OpenCV calls (ObjC++ wrapper)
-   - Reference the Python source with inline comments: `// Ported from projection.py:36-47`
-   - Save output images to `~/Desktop/perf-optimization/`, analysis/logs to `/tmp/perf-optimization/`
-   - When comparing Swift vs Python behavior, use the comparison script or test infrastructure
+   - Reference the Python source with inline comments: `// Ported from solve.py:42-49`
+   - For the DLT implementation: use LAPACK `dgesdd_` via `import Accelerate` for SVD
+   - LAPACK uses column-major storage — transpose matrices accordingly
 
 7. **Verify**: Build and test:
    ```bash
@@ -79,7 +74,19 @@ Don't hesitate to use these if the task involves non-obvious decisions.
      -destination "platform=iOS Simulator,name=iPhone 17 Pro"
    ```
 
-8. **Running the Swift pipeline on disk images** (for comparison/validation):
+8. **Python match verification** — MANDATORY after implementation:
+
+   After implementing any task that changes computation (Phase 1 tasks especially), verify Swift still matches Python:
+
+   ```bash
+   # Run Python
+   page-dewarp ~/Desktop/IMG_1389.jpeg 2>&1 | tail -5
+   OPT_METHOD=L-BFGS-B page-dewarp ~/Desktop/IMG_1389.jpeg 2>&1 | tail -5
+   ```
+
+   Compare output dimensions with Swift (via test infrastructure or RunSingleImageTest). They must match exactly. If they don't, DO NOT commit — fix the issue first.
+
+9. **Running the Swift pipeline on disk images** (for comparison/validation):
    The library is iOS-only. To process images from disk:
    - Copy input to `/tmp/` (simulator shares host's `/tmp` on Apple Silicon)
    - Create a test file that loads from `/tmp`, runs DewarpPipeline.process(), writes output to `/tmp`
@@ -87,21 +94,19 @@ Don't hesitate to use these if the task involves non-obvious decisions.
    - After adding/removing test files, always run `xcodegen generate && pod install`
    - See `docs/running-on-disk-images.md` for full details
 
-   To compare with Python:
-   - Default: `page-dewarp <image-path>`
-   - With L-BFGS-B: `OPT_METHOD=L-BFGS-B page-dewarp <image-path>`
-
    Test images are at: `~/Desktop/IMG_1369.jpeg`, `~/Desktop/IMG_1389.jpeg`, `~/Desktop/IMG_1413.jpeg`, `~/Desktop/IMG_1799.jpeg`, `~/Desktop/IMG_1868.jpeg`
 
-9. **Commit**: Stage and commit with a conventional commit message:
+10. **Commit**: Stage and commit with a conventional commit message:
     ```
-    fix(optimizer): <description>
+    feat(solver): replace solvePnP with pure-Swift DLT
+    refactor(bridge): remove calib3d methods from OpenCVWrapper
+    chore(podspec): add CocoaPods podspec with opencv-rne dependency
     ```
     Before committing, run `git pull --rebase` to incorporate any parallel workers' commits.
 
-10. **Mark completed**: Run `stm update <id> --status completed`
+11. **Mark completed**: Run `stm update <id> --status completed`
 
-11. **Report**: Print a summary of what you did, what worked, and any concerns for the evaluator.
+12. **Report**: Print a summary of what you did, what worked, and any concerns for the evaluator.
 
 ## Important
 
@@ -110,4 +115,5 @@ Don't hesitate to use these if the task involves non-obvious decisions.
 - If a task needs something not in STM, create a new task with `stm add`.
 - Keep commits small and focused on the single task.
 - Do NOT modify files outside the task scope.
-- Do NOT break the Powell optimizer path — it must continue to work.
+- Do NOT break the Powell or L-BFGS-B optimizer paths — both must continue to work.
+- Do NOT change the public API (`DewarpPipeline.process(image:method:output:)`).

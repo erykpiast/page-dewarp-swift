@@ -65,44 +65,6 @@ final class OpenCVBridgeTests: XCTestCase {
         XCTAssertEqual(hull.count, 4, "Square hull should have 4 points")
     }
 
-    // MARK: - Rodrigues
-
-    func testRodriguesZeroVectorIsIdentity() {
-        // Rodrigues([0,0,0]) → identity matrix.
-        let rvec: [NSNumber] = [0, 0, 0]
-        let mat = OpenCVWrapper.rodrigues(fromVector: rvec)
-        XCTAssertEqual(mat.count, 9)
-        let expected = [1.0, 0.0, 0.0,
-                        0.0, 1.0, 0.0,
-                        0.0, 0.0, 1.0]
-        for (i, v) in mat.enumerated() {
-            XCTAssertEqual(v.doubleValue, expected[i], accuracy: 1e-6,
-                           "Rodrigues(0) should be identity at index \(i)")
-        }
-    }
-
-    // MARK: - ProjectPoints
-
-    func testProjectPointsOriginStaysAtPrincipalPoint() {
-        // A single point at world origin with identity rotation/translation.
-        // With fx=fy=1, cx=cy=0, it should project to (0,0).
-        let pts3D: [NSNumber] = [0, 0, 1]  // z=1 for valid projection
-        let rvec: [NSNumber] = [0, 0, 0]
-        let tvec: [NSNumber] = [0, 0, 0]
-        // Camera matrix: fx=1, fy=1, cx=0, cy=0
-        let K: [NSNumber] = [1, 0, 0,
-                              0, 1, 0,
-                              0, 0, 1]
-        let dist: [NSNumber] = [0, 0, 0, 0, 0]
-        let projected = OpenCVWrapper.projectPointsWith3DPoints(pts3D, rvec: rvec,
-                                                    tvec: tvec, cameraMatrix: K,
-                                                    distCoeffs: dist)
-        XCTAssertEqual(projected.count, 1)
-        let pt = projected[0].cgPointValue
-        XCTAssertEqual(pt.x, 0.0, accuracy: 1e-6)
-        XCTAssertEqual(pt.y, 0.0, accuracy: 1e-6)
-    }
-
     // MARK: - AdaptiveThreshold
 
     func testAdaptiveThresholdProducesGrayscaleImage() {

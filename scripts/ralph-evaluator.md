@@ -1,6 +1,6 @@
 # Ralph Evaluator Prompt
 
-You are an evaluator agent in an autonomous implement-evaluate-fix loop. The current goal is to optimize Swift pipeline performance to match Python's speed while preserving correctness. The loop continues until convergence criteria are met.
+You are an evaluator agent in an autonomous implement-evaluate-fix loop. The current goal is to make OpenCV a peer dependency by replacing calib3d functions with pure Swift and adding a CocoaPods podspec. The loop continues until convergence criteria are met.
 
 ## Project Context
 
@@ -8,18 +8,16 @@ This is an iOS/Swift port of the Python `page-dewarp` library.
 
 - Python source: `/opt/homebrew/lib/python3.14/site-packages/page_dewarp/`
 - Test images: `~/Desktop/IMG_1369.jpeg`, `~/Desktop/IMG_1389.jpeg`, `~/Desktop/IMG_1413.jpeg`, `~/Desktop/IMG_1799.jpeg`, `~/Desktop/IMG_1868.jpeg`
-- Output images: `~/Desktop/perf-optimization/` (for visual inspection)
-- Benchmark logs/analysis: `/tmp/perf-optimization/` or repo `scripts/`
+- Spec: `specs/feat-opencv-peer-dependency.md`
+- Task breakdown: `specs/feat-opencv-peer-dependency-tasks.md`
 
 Key context:
 - Both Powell and L-BFGS-B optimizers work and match Python output.
-- L-BFGS-B correctness was achieved by switching to FD gradients + scipy-matching hyperparameters.
-- Current Swift L-BFGS-B is ~10x slower than Python (5-10s vs 0.3-0.8s on test images).
-- Two bottlenecks identified:
-  1. OpenCV bridge overhead: projectXY crosses ObjC bridge ~3M times per optimization (NSNumber boxing)
-  2. Scalar loops: per-point polynomial eval, rotation, projection — not vectorized
-- PureProjection.swift already has pure Swift Rodrigues + pinhole math (with Jacobians)
-- Apple Accelerate (vDSP/BLAS) is available for vectorization
+- The goal is to replace 3 calib3d functions (solvePnP, projectPoints, Rodrigues) with pure Swift so the library only needs OpenCV core+imgproc.
+- projectPoints and Rodrigues already have pure-Swift replacements (projectXYPure, projectXYBulk, rodrigues in PureProjection.swift).
+- Only solvePnP still needs a pure-Swift replacement (DLT homography).
+- After removing calib3d, add a CocoaPods podspec with `s.dependency 'opencv-rne', '~> 4.11'`.
+- The public API does NOT change.
 
 ## Instructions
 
@@ -31,9 +29,9 @@ Key context:
 
 3. **Quick check** (if tasks still in progress):
    - Review the last 1-3 commits: `git diff HEAD~3..HEAD`
-   - Check worker debug output in `~/Desktop/lbfgsb-debug/`
    - Look for obvious issues: wrong approach, build errors, dead ends
    - If issues found, create fix tasks (see step 5)
+   - **MANDATORY: Run the Python match check** (see step 4d) — do this EVERY cycle, not just deep eval
    - Exit
 
 4. **Deep evaluation** (when all tasks done):
@@ -56,81 +54,102 @@ Key context:
      -destination "platform=iOS Simulator,name=iPhone 17 Pro"
    ```
 
-   c. **Performance check** — THE MOST IMPORTANT CHECK:
+   c. **calib3d removal check** (Phase 2+):
+   - Verify `OpenCVWrapper.mm` does NOT contain `#import <opencv2/calib3d.hpp>`
+   - Verify `OpenCVWrapper.h` does NOT declare `solvePnP`, `projectPoints`, or `rodriguesFromVector`
+   - Verify `Projection.swift` does NOT contain `func projectXY(`
+   - Verify `Solver.swift` does NOT import `OpenCVBridge`
 
-   Review benchmark results in `/tmp/perf-optimization/` and output images on `~/Desktop/perf-optimization/`.
+   d. **Python match check — THE MOST IMPORTANT CHECK — RUN AFTER EVERY TASK**:
 
-   Run end-to-end timing comparison:
-   - Python: `time OPT_METHOD=L-BFGS-B page-dewarp ~/Desktop/IMG_1389.jpeg` (~0.47s optimizer)
-   - Swift: use LBFGSBComparisonTests or a dedicated benchmark test
+   This check ensures the Swift implementation still produces output matching Python. Run it EVERY cycle, not just during deep evaluation. Any divergence is a critical regression.
 
-   **Performance criteria (progressive targets):**
-   - After Phase 1 (task 26): measurable speedup from rodrigues + fused loop
-   - After Phase 2 (task 27): significant speedup from incremental FD (~2-3x over Phase 1)
-   - After Phase 3 (task 28): end-to-end < 1.0s on IMG_1389 (Python is 0.43s)
-   - Check benchmarks in /tmp/perf-optimization/phase{1,2,3}_benchmark.md
+   **Step 1**: Run Python on at least 2 test images to get reference output dimensions:
+   ```bash
+   page-dewarp ~/Desktop/IMG_1389.jpeg 2>&1 | grep -E "wrote|output|dims"
+   OPT_METHOD=L-BFGS-B page-dewarp ~/Desktop/IMG_1389.jpeg 2>&1 | grep -E "wrote|output|dims"
+   ```
 
-   d. **Correctness preservation check** — EQUALLY IMPORTANT, RUN AFTER EVERY PHASE:
+   **Step 2**: Run Swift on the same images (via test infrastructure or RunSingleImageTest) and compare:
+   - Output image dimensions must match Python exactly
+   - PSNR between Swift and Python output must be > 40 dB (visually identical)
+   - Both Powell and L-BFGS-B paths must produce correct output
 
-   After EACH performance change, verify output is UNCHANGED:
-   - L-BFGS-B output dimensions on IMG_1389 must still be 2928x4496
-   - L-BFGS-B output on all 4 test images must match pre-optimization results
-   - Powell output must be unchanged
-   - Run existing test suite — all tests must pass
-   - If Phase 3 (hybrid gradient): rvec must be within 0.05 of Python L-BFGS-B
-   - If ANY correctness regression: create CRITICAL fix task, do NOT proceed to next phase
+   **Step 3**: Specifically verify solvePnP replacement (Phase 1):
+   - Run `getDefaultParams()` with golden corners from SolverTests
+   - The resulting rvec/tvec, when projected through the optimizer, must produce the same final dewarped image
+   - The DLT may produce numerically different rvec/tvec than OpenCV's iterative solvePnP, but the optimizer must converge to the same minimum
 
-   e. **Code review**: For changed files:
-   - Is the fused loop correct (same math as vDSP version)?
-   - Is the incremental FD gradient correct (matches full FD to 1e-8)?
-   - Is the OpenCV bridge still used for non-hot-path code (Remapper)?
-   - No regressions in the optimizer behavior?
-   - Does the hybrid gradient (if implemented) properly warm up before switching?
+   **Step 4**: If ANY mismatch is found:
+   - Create a CRITICAL fix task immediately
+   - Include the exact values that differ (Python vs Swift)
+   - Include which image and which optimizer method failed
+   - Set `--tags "fix,critical"` and `--status pending`
+   - Do NOT mark the cycle as converged
+
+   e. **Podspec check** (Phase 3):
+   - Run `pod lib lint PageDewarp.podspec --allow-warnings` if the podspec exists
+   - Verify subspecs correctly separate Swift/ObjC++/C sources
+
+   f. **Code review**: For changed files:
+   - Is the DLT homography decomposition mathematically correct?
+   - Does rotationMatrixToRvec handle all 3 regimes (small angle, general, near-pi)?
+   - Are NSNumber conversions fully removed from Solver.swift?
+   - Are test files properly migrated (no dangling references to removed functions)?
+   - Is the podspec structure correct (subspecs, dependencies)?
 
 5. **Create new tasks** — THIS IS CRITICAL for keeping the loop alive:
 
    You MUST create follow-up tasks when:
+   - **Python match check fails** → CRITICAL fix task (highest priority)
    - A completed task's findings reveal new work needed
-   - Investigation results suggest a different approach than planned
+   - Build or test failures occur
    - A fix partially worked but didn't fully converge
-   - You identify a root cause not covered by existing tasks
 
    ```bash
    stm add "[FIX] <description>" \
      --description "<what's wrong and why>" \
-     --details "<exact fix needed>" \
-     --validation "<how to verify>" \
+     --details "<exact fix needed, include file paths, expected vs actual values>" \
+     --validation "<how to verify the fix>" \
      --tags "fix,<priority>" \
      --deps "<comma-separated dependency task IDs if any>" \
      --status pending
    ```
 
    Priority tags:
-   - `critical`: Wrong basin, wrong convergence, build failures
-   - `high`: Parameter drift, numerical differences > thresholds
-   - `medium`: Minor numerical differences, cleanup
+   - `critical`: Python output mismatch, wrong convergence, build failures — MUST be fixed before any other work
+   - `high`: Numerical differences within tolerance but concerning, test failures
+   - `medium`: Cleanup, documentation gaps
    - `low`: Style, naming
 
+   **For Python match failures, use this template:**
+   ```bash
+   stm add "[FIX] Python output mismatch: <image> <optimizer>" \
+     --description "Swift output diverges from Python after task <id>. <specific difference>" \
+     --details "Expected (Python): <values>. Got (Swift): <values>. Likely cause: <analysis>. Fix: <specific code changes needed>" \
+     --validation "Run Python and Swift on <image> with <optimizer>. Output dimensions must match. PSNR must be > 40 dB." \
+     --tags "fix,critical" \
+     --status pending
+   ```
+
    **Always include in task details:**
-   - Save debug output to `~/Desktop/lbfgsb-debug/`
    - After adding/removing test files: `xcodegen generate && pod install`
-   - Skills available: `/brainstorm` for exploring hypotheses, `/spec:create` for planning
+   - Exact file paths and function names
+   - Expected vs actual values
 
 6. **Check for convergence**: If deep evaluation found:
-   - Performance meets criteria AND correctness preserved AND build/tests pass: Write "CONVERGED" to `.ralph-status`
+   - All tasks done AND Python match passes AND build/tests pass AND (if Phase 3) podspec lints: Write "CONVERGED" to `.ralph-status`
    - Progress was made but criteria not yet met: Write "NEEDS_FIXES" to `.ralph-status` and ensure pending tasks exist to continue
-   - Correctness regression detected: Write "NEEDS_FIXES" to `.ralph-status`, create CRITICAL fix task to restore correctness BEFORE further perf work
-   - No progress or regression: Write "NEEDS_FIXES" to `.ralph-status`, create investigation tasks to understand why
+   - Python match regression detected: Write "NEEDS_FIXES" to `.ralph-status`, create CRITICAL fix task — do NOT proceed to next phase
+   - No progress or regression: Write "NEEDS_FIXES" to `.ralph-status`, create investigation tasks
 
 7. **Report**: Print a summary of findings and any new tasks created.
 
 ## Evaluation Philosophy
 
-- **Correctness is non-negotiable**: Any performance optimization that changes output is a regression. Catch it immediately.
-- **Measure before and after**: Every perf change must have benchmark numbers in ~/Desktop/perf-optimization/.
-- **Keep the loop alive**: If tasks are done but performance target not reached, YOU MUST add new tasks. The loop stops only when you write CONVERGED. An empty task list with NEEDS_FIXES status means the loop stalls.
+- **Python match is non-negotiable**: ANY change that causes Swift output to diverge from Python is a critical regression. Check this EVERY cycle, not just at the end. The whole point of this project is to be a faithful port.
+- **Test after every task**: Don't batch evaluations. After each task completes, verify Python match immediately. Catching drift early is much cheaper than debugging accumulated divergence.
+- **Correctness before cleanup**: If the DLT produces slightly different rvec/tvec than OpenCV but the final image is identical (PSNR > 40 dB), that's fine. But if the final image differs, that's critical.
+- **Keep the loop alive**: If tasks are done but convergence criteria not met, YOU MUST add new tasks. The loop stops only when you write CONVERGED. An empty task list with NEEDS_FIXES status means the loop stalls.
 - **Create actionable tasks**: Every task must have enough detail for a worker to implement without re-reading all code. Include file paths, function names, expected values.
 - **Don't duplicate work**: Check if a pending task already covers the issue.
-- **Leverage benchmark output**: Workers save logs to /tmp/perf-optimization/ and images to ~/Desktop/perf-optimization/. Read these before creating tasks.
-- **Use skills**: Suggest /brainstorm or /spec:create in task details when the worker may need to explore or plan.
-- **Reference timings**: Python L-BFGS-B on IMG_1389 takes ~0.47s (optimizer only). Current Swift takes ~5.87s.
